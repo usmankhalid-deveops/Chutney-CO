@@ -1,0 +1,63 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;750&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Custom print media rules for printing clean receipts without styling leakage */
+@media print {
+  @page {
+    margin: 15mm 10mm;
+    size: portrait;
+  }
+  
+  /* Hide all elements on the screen during print */
+  body * {
+    visibility: hidden !important;
+  }
+  
+  /* Only display the printable receipt container and its children */
+  #receipt-print-canvas, #receipt-print-canvas * {
+    visibility: visible !important;
+  }
+  
+  #receipt-print-canvas {
+    position: absolute;
+    left: 5% !important;
+    top: 0 !important;
+    width: 90% !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    background: white !important;
+    color: #000000 !important;
+  }
+
+  /* Force light theme colors on print even if the client uses dark mode */
+  .dark #receipt-print-canvas {
+    background: white !important;
+    color: #000000 !important;
+    border: none !important;
+  }
+  
+  .dark #receipt-print-canvas * {
+    color: #000000 !important;
+    background-color: transparent !important;
+    border-color: #e2e8f0 !important;
+  }
+
+  .dark #receipt-print-canvas p, 
+  .dark #receipt-print-canvas h1, 
+  .dark #receipt-print-canvas h4, 
+  .dark #receipt-print-canvas span {
+    color: #0f172a !important;
+  }
+}

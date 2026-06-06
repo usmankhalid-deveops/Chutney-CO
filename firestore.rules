@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global safety net - default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    // Check if user is admin. We check the user record in Firestore.
+    function isAdmin() {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // 1. Users collection rules
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Permit creation of user profile matching active Auth ID.
+      // Boostrap usmankhalid619131ics@gmail.com as and admin automatically. All others are customers.
+      allow create: if isOwner(userId) && 
+        request.resource.data.uid == userId &&
+        request.resource.data.email == request.auth.token.email &&
+        (request.resource.data.role == 'customer' || 
+         (request.resource.data.role == 'admin' && request.auth.token.email == 'usmankhalid619131ics@gmail.com'));
+      
+      // Block users from modifying crucial profile fields like their role. Admins have full access.
+      allow update: if (isOwner(userId) && 
+        request.resource.data.uid == userId &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.role == resource.data.role)
+        || isAdmin();
+        
+      allow delete: if isAdmin();
+    }
+
+    // 2. Menu collection rules
+    match /menu/{itemId} {
+      // Anyone can read the food menu
+      allow read: if true;
+      
+      // Only administrators can add, edit, or delete dishes
+      allow write: if isAdmin();
+    }
+
+    // 3. Orders collection rules
+    match /orders/{orderId} {
+      // Read access is restricted to the order's owner or an admin
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      
+      // Create is restricted to authenticated users matching the order owner, starting in standard pending state with proper delivery details
+      allow create: if isSignedIn() && 
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.recipientName is string &&
+        request.resource.data.recipientEmail is string &&
+        request.resource.data.recipientPhone is string;
+      
+      // Action-based state locking:
+      allow update: if isSignedIn() && (
+        // Admin update pattern
+        (isAdmin() && request.resource.data.userId == resource.data.userId) ||
+        // Customer cancel pattern: can only alter status to 'cancelled' if currently 'pending'
+        (resource.data.userId == request.auth.uid && 
+         request.resource.data.status == 'cancelled' && 
+         resource.data.status == 'pending' && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']))
+      );
+      
+      allow delete: if isAdmin();
+    }
+  }
+}
